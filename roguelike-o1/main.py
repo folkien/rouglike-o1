@@ -1,15 +1,16 @@
 import curses
 import random
+from enum import Enum
 
 # Definicje znaków
-PLAYER_CHAR = '@'
-WALL_CHAR = '#'
-FLOOR_CHAR = '.'
-CHEST_CHAR = 'C'
-GOBLIN_CHAR = 'g'
-TROLL_CHAR = 'T'
-DRAGON_CHAR = 'D'
-STAIRS_DOWN_CHAR = '>'
+PLAYER_CHAR = "@"
+WALL_CHAR = "#"
+FLOOR_CHAR = "."
+CHEST_CHAR = "C"
+GOBLIN_CHAR = "g"
+TROLL_CHAR = "T"
+DRAGON_CHAR = "D"
+STAIRS_DOWN_CHAR = ">"
 
 # Konfiguracja gry
 MAP_WIDTH = 40
@@ -18,7 +19,20 @@ NUM_CHESTS = 5
 NUM_MONSTERS = 10
 MAX_DUNGEON_LEVELS = 20
 
+
+class ItemCategories(str, Enum):
+    """Enum dla kategorii przedmiotów"""
+
+    SWORD = "sword"
+    SHIELD = "shield"
+    BOOTS = "boots"
+    HELMET = "helmet"
+    POTION = "potion"
+
+
 class Entity:
+    """Klasa bazowa dla gracza i potworów"""
+
     def __init__(self, x, y, char, name, hp, attack, defense=0):
         self.x = x
         self.y = y
@@ -28,39 +42,47 @@ class Entity:
         self.attack = attack
         self.defense = defense
 
+
 class Item:
-    def __init__(self, name, category, attack=0, defense=0):
+    """Klasa reprezentująca przedmioty w grze"""
+
+    def __init__(self, name, category, attack=0, defense=0, healing=0):
         self.name = name
-        self.category = category  # 'sword', 'shield', 'boots', 'helmet'
+        self.category = category  # 'sword', 'shield', 'boots', 'helmet', 'potion'
         self.attack = attack
         self.defense = defense
+        self.healing = healing
 
     def __str__(self):
-        return f"{self.name} ({self.category}) [Atk: {self.attack}, Def: {self.defense}]"
+        if self.category == "potion":
+            return f"{self.name} (Leczy {self.healing} HP)"
+        else:
+            return f"{self.name} ({self.category}) [Atk: {self.attack}, Def: {self.defense}]"
+
 
 class Player(Entity):
+    """Klasa reprezentująca postać gracza"""
+
     def __init__(self, x, y):
         attack = random.randint(0, 5)
         defense = random.randint(0, 5)
-        super().__init__(x, y, PLAYER_CHAR, 'Rycerz', 100, attack, defense)
+        super().__init__(x, y, PLAYER_CHAR, "Rycerz", 100, attack, defense)
+        self.max_hp = 100  # Maksymalne punkty życia
         self.inventory = []
         self.equipped = {}  # {'sword': item, 'shield': item, ...}
         self.exp = 0
         self.level = 1
 
-    def total_attack(self):
-        base_attack = self.attack
-        for item in self.equipped.values():
-            base_attack += item.attack
-        return base_attack
+    def total_attack(self) -> int:
+        """Zwraca całkowitą wartość ataku, łącznie z wyposażonymi przedmiotami"""
+        return self.attack + sum(item.attack for item in self.equipped.values())
 
-    def total_defense(self):
-        base_defense = self.defense
-        for item in self.equipped.values():
-            base_defense += item.defense
-        return base_defense
+    def total_defense(self) -> int:
+        """Zwraca całkowitą wartość obrony, łącznie z wyposażonymi przedmiotami"""
+        return self.defense + sum(item.defense for item in self.equipped.values())
 
-    def check_level_up(self):
+    def check_level_up(self) -> bool:
+        """Sprawdza, czy gracz zdobył wystarczająco doświadczenia do awansu"""
         required_exp = self.level * 1000
         if self.exp >= required_exp:
             self.level += 1
@@ -69,10 +91,14 @@ class Player(Entity):
             return True
         return False
 
+
 class Monster(Entity):
+    """Klasa reprezentująca potwora w grze"""
+
     def __init__(self, x, y, char, name, hp, attack, exp_value):
         super().__init__(x, y, char, name, hp, attack)
         self.exp_value = exp_value
+
 
 class Game:
     def __init__(self, stdscr):
@@ -85,10 +111,10 @@ class Game:
         # Dodaj ściany na brzegach
         for x in range(MAP_WIDTH):
             self.map[0][x] = WALL_CHAR
-            self.map[MAP_HEIGHT-1][x] = WALL_CHAR
+            self.map[MAP_HEIGHT - 1][x] = WALL_CHAR
         for y in range(MAP_HEIGHT):
             self.map[y][0] = WALL_CHAR
-            self.map[y][MAP_WIDTH-1] = WALL_CHAR
+            self.map[y][MAP_WIDTH - 1] = WALL_CHAR
 
         # Umieść losowo skrzynie
         self.chests = []
@@ -104,7 +130,7 @@ class Game:
             self.monsters.append(monster)
 
         # Umieść gracza
-        if hasattr(self, 'player'):
+        if hasattr(self, "player"):
             # Zachowaj ekwipunek i statystyki
             self.player.x, self.player.y = self.get_random_floor_position()
         else:
@@ -118,13 +144,13 @@ class Game:
     def create_monster(self, x, y):
         if self.level % 10 == 0:
             # Smok na co 10 poziomie
-            monster = Monster(x, y, DRAGON_CHAR, 'Smok', 200, 25, 1000)
+            monster = Monster(x, y, DRAGON_CHAR, "Smok", 200, 25, 1000)
         else:
-            monster_type = random.choice(['Goblin', 'Troll'])
-            if monster_type == 'Goblin':
-                monster = Monster(x, y, GOBLIN_CHAR, 'Goblin', 30, 5, 25)
+            monster_type = random.choice(["Goblin", "Troll"])
+            if monster_type == "Goblin":
+                monster = Monster(x, y, GOBLIN_CHAR, "Goblin", 30, 5, 25)
             else:
-                monster = Monster(x, y, TROLL_CHAR, 'Troll', 50, 15, 100)
+                monster = Monster(x, y, TROLL_CHAR, "Troll", 50, 15, 100)
         return monster
 
     def get_random_floor_position(self):
@@ -134,15 +160,31 @@ class Game:
             if self.map[y][x] == FLOOR_CHAR:
                 return x, y
 
-    def generate_random_item(self, exp_value=0):
-        categories = ['sword', 'shield', 'boots', 'helmet']
-        category = random.choice(categories)
-        # Lepsze potwory dają lepsze przedmioty
-        max_bonus = min(5 + exp_value // 100, 15)
-        attack = random.randint(1, max_bonus) if category == 'sword' else 0
-        defense = random.randint(1, max_bonus) if category != 'sword' else 0
-        name = f"{category.capitalize()} +{attack + defense}"
-        return Item(name, category, attack, defense)
+    def generate_random_item(self, exp_value: int = 0) -> Item:
+        """Generuje losowy przedmiot na podstawie wartości doświadczenia potwora"""
+        # 20% szans na miksturę
+        if random.random() < 0.2:
+            category = "potion"
+            name = "Mikstura Leczenia"
+            healing = 25  # Mikstura leczy 25 HP
+            return Item(name, category, healing=healing)
+        else:
+            categories = ["sword", "shield", "boots", "helmet"]
+            category = random.choice(categories)
+
+            max_primary_bonus = min(random.randint(5, 30) + exp_value // 100, 100)
+            max_secondary_bonus = max_primary_bonus // 2
+
+            attack = (
+                random.randint(1, max_primary_bonus) if category == "sword" else random.randint(0, max_secondary_bonus)
+            )
+            defense = (
+                random.randint(1, max_primary_bonus)
+                if category != "sword"
+                else random.randint(0, max_secondary_bonus)
+            )
+            name = f"{category.capitalize()} +{attack + defense}"
+            return Item(name, category, attack, defense)
 
     def draw(self):
         self.stdscr.clear()
@@ -152,7 +194,7 @@ class Game:
                 self.stdscr.addch(y, x, char)
 
         # Narysuj skrzynie
-        for (x, y) in self.chests:
+        for x, y in self.chests:
             self.stdscr.addch(y, x, CHEST_CHAR)
 
         # Narysuj potwory
@@ -169,7 +211,7 @@ class Game:
         self.stdscr.addstr(
             MAP_HEIGHT,
             0,
-            f'Poziom: {self.level}  HP: {self.player.hp}  Atk: {self.player.total_attack()}  Def: {self.player.total_defense()}  Exp: {self.player.exp}  Gracz Poziom: {self.player.level}'
+            f"Poziom: {self.level}  HP: {self.player.hp}/{self.player.max_hp}  Atk: {self.player.total_attack()}  Def: {self.player.total_defense()}  Exp: {self.player.exp}  Gracz Poziom: {self.player.level}",
         )
         self.stdscr.refresh()
 
@@ -185,9 +227,9 @@ class Game:
             dx = -1
         elif key == curses.KEY_RIGHT:
             dx = 1
-        elif key == ord('e'):
+        elif key == ord("e"):
             self.open_inventory()
-        elif key == 10:  # Enter key
+        elif key == 10:  # Klawisz Enter
             self.attack()
         if dx != 0 or dy != 0:
             self.player_moved = True
@@ -221,33 +263,50 @@ class Game:
         cursor = 0
         while True:
             self.stdscr.clear()
-            self.stdscr.addstr(0, 0, 'Ekwipunek:')
+            self.stdscr.addstr(0, 0, "Ekwipunek:")
             for idx, item in enumerate(self.player.inventory):
-                marker = '>' if idx == cursor else ' '
-                equip_status = ''
-                for equipped_item in self.player.equipped.values():
-                    if item == equipped_item:
-                        equip_status = ' [Założony]'
-                        break
-                self.stdscr.addstr(idx + 1, 0, f'{marker} {idx + 1}. {item}{equip_status}')
-            self.stdscr.addstr(len(self.player.inventory) + 2, 0, 'U - załóż/zdejmij, Esc - powrót')
+                marker = ">" if idx == cursor else " "
+                equip_status = ""
+                if item.category != "potion":
+                    if item in self.player.equipped.values():
+                        equip_status = " [Założony]"
+                self.stdscr.addstr(idx + 1, 0, f"{marker} {idx + 1}. {item}{equip_status}")
+            self.stdscr.addstr(
+                len(self.player.inventory) + 2, 0, "U - użyj/załóż, D - wyrzuć, Esc - powrót"
+            )
             self.stdscr.refresh()
             key = self.stdscr.getch()
             if key == curses.KEY_UP and cursor > 0:
                 cursor -= 1
             elif key == curses.KEY_DOWN and cursor < len(self.player.inventory) - 1:
                 cursor += 1
-            elif key == ord('u'):
+            elif key == ord("u"):
                 if len(self.player.inventory) > 0:
                     item = self.player.inventory[cursor]
                     category = item.category
-                    if category in self.player.equipped and self.player.equipped[category] == item:
-                        # Zdejmij przedmiot
-                        del self.player.equipped[category]
+                    if category == "potion":
+                        # Użyj mikstury
+                        self.player.hp += item.healing
+                        if self.player.hp > self.player.max_hp:
+                            self.player.hp = self.player.max_hp
+                        # Usuń miksturę z ekwipunku
+                        del self.player.inventory[cursor]
+                        if cursor >= len(self.player.inventory):
+                            cursor = len(self.player.inventory) - 1
                     else:
-                        # Załóż przedmiot, zdejmując ewentualnie poprzedni
-                        self.player.equipped[category] = item
-            elif key == 27:  # ESC key
+                        if category in self.player.equipped and self.player.equipped[category] == item:
+                            # Zdejmij przedmiot
+                            del self.player.equipped[category]
+                        else:
+                            # Załóż przedmiot, zdejmując ewentualnie poprzedni
+                            self.player.equipped[category] = item
+            elif key == ord("d"):
+                if len(self.player.inventory) > 0:
+                    # Wyrzuć przedmiot
+                    del self.player.inventory[cursor]
+                    if cursor >= len(self.player.inventory):
+                        cursor = len(self.player.inventory) - 1
+            elif key == 27:  # Klawisz ESC
                 break
 
     def update(self):
@@ -299,11 +358,11 @@ class Game:
             target_dy = random.choice([-1, 0, 1])
 
         move_choice = 0
-        if monster.name == 'Goblin':
+        if monster.name == "Goblin":
             move_choice = random.choice([0, 1, 2])
-        elif monster.name == 'Troll':
+        elif monster.name == "Troll":
             move_choice = random.choice([0, 1])
-        elif monster.name == 'Smok':
+        elif monster.name == "Smok":
             move_choice = 1
 
         for _ in range(move_choice):
@@ -323,17 +382,18 @@ class Game:
 
     def game_over(self):
         self.stdscr.clear()
-        self.stdscr.addstr(MAP_HEIGHT // 2, MAP_WIDTH // 2 - 5, 'Koniec gry!')
+        self.stdscr.addstr(MAP_HEIGHT // 2, MAP_WIDTH // 2 - 5, "Koniec gry!")
         self.stdscr.refresh()
         self.stdscr.getch()
         exit()
 
     def game_win(self):
         self.stdscr.clear()
-        self.stdscr.addstr(MAP_HEIGHT // 2, MAP_WIDTH // 2 - 7, 'Gratulacje! Wygrałeś!')
+        self.stdscr.addstr(MAP_HEIGHT // 2, MAP_WIDTH // 2 - 7, "Gratulacje! Wygrałeś!")
         self.stdscr.refresh()
         self.stdscr.getch()
         exit()
+
 
 def main(stdscr):
     curses.curs_set(0)
@@ -345,5 +405,6 @@ def main(stdscr):
         dx, dy = game.handle_input()
         game.move_player(dx, dy)
         game.update()
+
 
 curses.wrapper(main)
