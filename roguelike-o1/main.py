@@ -95,6 +95,11 @@ class Item:
         self.defense = defense
         self.healing = healing
 
+    @property
+    def total(self) -> int:
+        """Total stat value"""
+        return self.attack + self.defense + self.healing
+
     def __str__(self):
         if self.category == "potion":
             return f"{self.name} (Leczy {self.healing} HP)"
@@ -335,7 +340,10 @@ class Game:
             title_surface = font.render("Ekwipunek:", True, (255, 255, 255))
             screen.blit(title_surface, (10, 10))
             # Wyświetl przedmioty
-            for idx, item in enumerate(self.player.inventory):
+            inventory_sorted = sorted(self.player.inventory, key=lambda x: x.total, reverse=True)
+
+            # Here is somthing wrong with selecting items if inventory is sorted!
+            for idx, item in enumerate(inventory_sorted):
                 y_pos = 40 + idx * 30
                 marker = ">" if idx == cursor else " "
                 equip_status = ""
@@ -345,6 +353,7 @@ class Game:
                 item_text = f"{marker} {idx + 1}. {item}{equip_status}"
                 item_surface = font.render(item_text, True, (255, 255, 255))
                 screen.blit(item_surface, (10, y_pos))
+
             # Wyświetl instrukcje
             instructions = "U - użyj/załóż, D - wyrzuć, Esc - powrót"
             instructions_surface = font.render(instructions, True, (255, 255, 255))
