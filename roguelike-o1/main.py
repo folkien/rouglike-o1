@@ -146,7 +146,6 @@ class Game:
     def __init__(self):
         self.level = 1
         self.running = True
-        self.clock = pygame.time.Clock()
         self.generate_level()
 
     def generate_level(self):
@@ -203,7 +202,7 @@ class Game:
             if self.map[y][x] == FLOOR_CHAR:
                 return x, y
 
-    def generate_random_item(self, exp_value: int = 0) -> Item:
+    def generate_random_item(self, dungeon_level: int, exp_value: int = 0) -> Item:
         """Generuje losowy przedmiot na podstawie wartości doświadczenia potwora"""
         # 20% szans na miksturę
         if random.random() < 0.2:
@@ -216,7 +215,7 @@ class Game:
             categories = ["sword", "shield", "boots", "helmet"]
             category = random.choice(categories)
 
-            max_primary_bonus = min(random.randint(5, 30) + exp_value // 100, 100)
+            max_primary_bonus = min(random.randint(5, 30) + dungeon_level + exp_value // 100, 100)
             max_secondary_bonus = max_primary_bonus // 2
 
             attack = (
@@ -264,25 +263,41 @@ class Game:
         info_surface = font.render(info_text, True, (255, 255, 255))
         screen.blit(info_surface, (10, MAP_HEIGHT * TILE_SIZE + 5))
 
+        pygame.display.flip()
+
     def handle_input(self):
         dx, dy = 0, 0
         self.player_moved = False
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    dy = -1
-                elif event.key == pygame.K_DOWN:
-                    dy = 1
-                elif event.key == pygame.K_LEFT:
-                    dx = -1
-                elif event.key == pygame.K_RIGHT:
-                    dx = 1
-                elif event.key == pygame.K_e:
-                    self.open_inventory()
-                elif event.key == pygame.K_RETURN:
-                    self.attack()
+        waiting_for_input = True
+        while waiting_for_input:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    waiting_for_input = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        dy = -1
+                        waiting_for_input = False
+                    elif event.key == pygame.K_DOWN:
+                        dy = 1
+                        waiting_for_input = False
+                    elif event.key == pygame.K_LEFT:
+                        dx = -1
+                        waiting_for_input = False
+                    elif event.key == pygame.K_RIGHT:
+                        dx = 1
+                        waiting_for_input = False
+                    elif event.key == pygame.K_e:
+                        self.open_inventory()
+                        self.draw()  # Odśwież ekran po wyjściu z ekwipunku
+                    elif event.key == pygame.K_RETURN:
+                        self.attack()
+                        waiting_for_input = False
+                    elif event.key == pygame.K_ESCAPE:
+                        self.running = False
+                        waiting_for_input = False
+            # Rysuj ekran podczas oczekiwania na wejście
+            self.draw()
         if dx != 0 or dy != 0:
             self.player_moved = True
         return dx, dy
@@ -306,7 +321,7 @@ class Game:
                         pass  # Możesz dodać informację o awansie
                     # Drop przedmiot z 30% szansą
                     if random.random() < 0.3:
-                        item = self.generate_random_item(monster.exp_value)
+                        item = self.generate_random_item(dungeon_level=self.level, exp_value=monster.exp_value)
                         self.player.inventory.append(item)
                     self.monsters.remove(monster)
                 break
@@ -378,7 +393,7 @@ class Game:
         # Sprawdź, czy gracz najechał na skrzynię
         for chest in self.chests:
             if self.player.x == chest[0] and self.player.y == chest[1]:
-                item = self.generate_random_item()
+                item = self.generate_random_item(dungeon_level=self.level)
                 self.player.inventory.append(item)
                 self.chests.remove(chest)
                 break
@@ -487,12 +502,10 @@ def main():
     game = Game()
 
     while game.running:
+        game.draw()
         dx, dy = game.handle_input()
         game.move_player(dx, dy)
         game.update()
-        game.draw()
-        pygame.display.flip()
-        game.clock.tick(1)
 
     pygame.quit()
 
