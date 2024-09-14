@@ -92,10 +92,12 @@ class Entity:
         self.image = image
         self.name = name
         self.hp = hp
+        self.max_hp = hp
         self.attack = attack
         self.defense = defense
 
-    def draw(self, surface):
+    def draw(self, surface) -> None:
+        """Paint object on the screen"""
         surface.blit(self.image, (self.x * TILE_SIZE, self.y * TILE_SIZE))
 
 
@@ -151,6 +153,7 @@ class Player(Entity):
             self.attack += 1
             self.defense += 1
             return True
+
         return False
 
 
@@ -160,6 +163,28 @@ class Monster(Entity):
     def __init__(self, x, y, image, name, hp, attack, defense, exp_value):
         super().__init__(x, y, image, name, hp, attack, defense)
         self.exp_value = exp_value
+
+    def draw(self, surface) -> None:
+        # Rysujemy potwora
+        surface.blit(self.image, (self.x * TILE_SIZE, self.y * TILE_SIZE))
+        # Rysujemy pasek życia nad potworem
+        self.draw_health_bar(surface)
+
+    def draw_health_bar(self, surface):
+        # Ustawienia paska życia
+        bar_width = TILE_SIZE
+        bar_height = 5
+        health_ratio = self.hp / self.max_hp
+        health_bar_width = int(bar_width * health_ratio)
+
+        # Pozycja paska życia
+        bar_x = self.x * TILE_SIZE
+        bar_y = self.y * TILE_SIZE - bar_height - 2  # Nad potworem
+
+        # Tło paska (czerwone)
+        pygame.draw.rect(surface, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+        # Aktualne HP (zielone)
+        pygame.draw.rect(surface, (0, 255, 0), (bar_x, bar_y, health_bar_width, bar_height))
 
 
 class Game:
@@ -536,7 +561,7 @@ class Game:
         elif monster.name == "Troll":
             move_choice = random.choice([0, 1])
         elif monster.name == "Smok":
-            move_choice = 1
+            move_choice = random.choice([0, 1, 2, 3, 4])
 
         for _ in range(move_choice):
             new_x = monster.x + target_dx
