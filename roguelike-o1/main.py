@@ -27,8 +27,16 @@ STAIRS_DOWN_CHAR = ">"
 MAP_WIDTH = SCREEN_WIDTH // TILE_SIZE
 MAP_HEIGHT = SCREEN_HEIGHT // TILE_SIZE - 2  # Odejmiemy 2 linie na interfejs
 NUM_CHESTS = 5
-NUM_MONSTERS = 10
-MAX_DUNGEON_LEVELS = 20
+NUM_MONSTERS = 6
+MAX_DUNGEON_LEVELS = 30
+
+# Kolory
+COLOR_WHITE = (255, 255, 255)
+COLOR_BLUE = (0, 0, 255)
+COLOR_PURPLE = (128, 0, 128)
+COLOR_RED = (255, 0, 0)
+COLOR_GREEN = (0, 255, 0)
+COLOR_BLACK = (0, 0, 0)
 
 # Ładowanie obrazów
 player_image = pygame.image.load("images/player.png").convert_alpha()
@@ -41,18 +49,23 @@ dragon_image = pygame.image.load("images/dragon.png").convert_alpha()
 stairs_down_image = pygame.image.load("images/stairs_down.png").convert_alpha()
 potion_image = pygame.image.load("images/potion.png").convert_alpha()
 sword_image = pygame.image.load("images/sword.png").convert_alpha()
+spear_image = pygame.image.load("images/spear.png").convert_alpha()
+axe_image = pygame.image.load("images/axe.png").convert_alpha()
 shield_image = pygame.image.load("images/shield.png").convert_alpha()
 boots_image = pygame.image.load("images/boots.png").convert_alpha()
 helmet_image = pygame.image.load("images/helmet.png").convert_alpha()
 
 # Czcionki
 font = pygame.font.SysFont("Arial", 16)
+bold_font = pygame.font.SysFont("Arial", 16, bold=True)
 
 
 class ItemCategories(str, Enum):
     """Enum dla kategorii przedmiotów"""
 
     SWORD = "sword"
+    SPEAR = "spear"
+    AXE = "axe"
     SHIELD = "shield"
     BOOTS = "boots"
     HELMET = "helmet"
@@ -62,6 +75,8 @@ class ItemCategories(str, Enum):
 item_images = {
     "potion": potion_image,
     "sword": sword_image,
+    "spear": spear_image,
+    "axe": axe_image,
     "shield": shield_image,
     "boots": boots_image,
     "helmet": helmet_image,
@@ -89,7 +104,7 @@ class Item:
 
     def __init__(self, name, category, image, attack=0, defense=0, healing=0):
         self.name = name
-        self.category = category  # 'sword', 'shield', 'boots', 'helmet', 'potion'
+        self.category = category  # 'sword', 'spear', 'axe', 'shield', 'boots', 'helmet', 'potion'
         self.image = image
         self.attack = attack
         self.defense = defense
@@ -142,8 +157,8 @@ class Player(Entity):
 class Monster(Entity):
     """Klasa reprezentująca potwora w grze"""
 
-    def __init__(self, x, y, image, name, hp, attack, exp_value):
-        super().__init__(x, y, image, name, hp, attack)
+    def __init__(self, x, y, image, name, hp, attack, defense, exp_value):
+        super().__init__(x, y, image, name, hp, attack, defense)
         self.exp_value = exp_value
 
 
@@ -170,8 +185,9 @@ class Game:
             self.chests.append((x, y))
 
         # Umieść losowo potwory
+        monsters_amount = min(NUM_MONSTERS + self.level, 30)
         self.monsters = []
-        for _ in range(NUM_MONSTERS):
+        for _ in range(monsters_amount):
             x, y = self.get_random_floor_position()
             monster = self.create_monster(x, y)
             self.monsters.append(monster)
@@ -189,15 +205,35 @@ class Game:
         self.stairs_down = (x, y)
 
     def create_monster(self, x, y):
-        if self.level % 10 == 0:
-            # Smok na co 10 poziomie
-            monster = Monster(x, y, dragon_image, "Smok", 200, 25, 1000)
-        else:
-            monster_type = random.choice(["Goblin", "Troll"])
-            if monster_type == "Goblin":
-                monster = Monster(x, y, goblin_image, "Goblin", 30, 5, 25)
-            else:
-                monster = Monster(x, y, troll_image, "Troll", 50, 15, 100)
+        """Create monster based on dungeon level"""
+
+        # Goblin: Level 0: 80%, Level 5 and above: 30%
+        goblin_probability = 0.8
+        if self.level >= 5:
+            goblin_probability = 0.3
+
+        # Troll: Level 3 and above: 30%
+        troll_probability = 0.05
+        if self.level >= 3:
+            troll_probability = 0.30
+
+        # Dragon: Level is multiple of 10, Always dragons
+        dragon_probability = self.level / 100
+        if self.level != 0 and self.level % 10 == 0:
+            dragon_probability = 0.80
+
+        monster_type = random.choices(
+            population=["Goblin", "Troll", "Smok"],
+            weights=[goblin_probability, troll_probability, dragon_probability],
+        )[0]
+
+        if monster_type == "Goblin":
+            monster = Monster(x, y, goblin_image, "Goblin", hp=30, attack=5, defense=1, exp_value=25)
+        elif monster_type == "Troll":
+            monster = Monster(x, y, troll_image, "Troll", hp=100, attack=15, defense=10, exp_value=150)
+        elif monster_type == "Smok":
+            monster = Monster(x, y, dragon_image, "Smok", hp=400, attack=35, defense=30, exp_value=1000)
+
         return monster
 
     def get_random_floor_position(self):
@@ -214,20 +250,24 @@ class Game:
             category = "potion"
             name = "Mikstura Leczenia"
             healing = 25  # Mikstura leczy 25 HP
-            image = potion_image
+            image = item_images[category]
             return Item(name, category, image, healing=healing)
         else:
-            categories = ["sword", "shield", "boots", "helmet"]
+            categories = ["sword", "spear", "axe", "shield", "boots", "helmet"]
             category = random.choice(categories)
 
             max_primary_bonus = min(random.randint(5, 30) + dungeon_level + exp_value // 100, 100)
             max_secondary_bonus = max_primary_bonus // 2
 
             attack = (
-                random.randint(1, max_primary_bonus) if category == "sword" else random.randint(0, max_secondary_bonus)
+                random.randint(1, max_primary_bonus)
+                if category in ["sword", "spear", "axe"]
+                else random.randint(0, max_secondary_bonus)
             )
             defense = (
-                random.randint(1, max_primary_bonus) if category != "sword" else random.randint(0, max_secondary_bonus)
+                random.randint(1, max_primary_bonus)
+                if category not in ["sword", "spear", "axe"]
+                else random.randint(0, max_secondary_bonus)
             )
             name = f"{category.capitalize()} +{attack + defense}"
             image = item_images[category]
@@ -259,16 +299,42 @@ class Game:
         # Narysuj gracza
         self.player.draw(screen)
 
+        # Wyświetl pasek życia
+        self.draw_health_bar()
+
         # Wyświetl informacje
-        info_text = (
-            f"Poziom: {self.level}  HP: {self.player.hp}/{self.player.max_hp}  "
-            f"Atk: {self.player.total_attack()}  Def: {self.player.total_defense()}  "
-            f"Exp: {self.player.exp}  Gracz Poziom: {self.player.level}"
-        )
-        info_surface = font.render(info_text, True, (255, 255, 255))
-        screen.blit(info_surface, (10, MAP_HEIGHT * TILE_SIZE + 5))
+        self.draw_stats()
 
         pygame.display.flip()
+
+    def draw_health_bar(self):
+        bar_width = 200
+        bar_height = 20
+        x = 10
+        y = MAP_HEIGHT * TILE_SIZE + 5
+
+        # Tło paska
+        pygame.draw.rect(screen, COLOR_RED, (x, y, bar_width, bar_height))
+        # Wypełnienie paska
+        hp_ratio = self.player.hp / self.player.max_hp
+        pygame.draw.rect(screen, COLOR_GREEN, (x, y, bar_width * hp_ratio, bar_height))
+        # Obramowanie
+        pygame.draw.rect(screen, COLOR_WHITE, (x, y, bar_width, bar_height), 2)
+
+    def draw_stats(self):
+        y_offset = MAP_HEIGHT * TILE_SIZE + 30
+        # Atak
+        atk_text = bold_font.render(f"Atk: {self.player.total_attack()}", True, COLOR_BLUE)
+        screen.blit(atk_text, (10, y_offset))
+        # Obrona
+        def_text = bold_font.render(f"Def: {self.player.total_defense()}", True, COLOR_PURPLE)
+        screen.blit(def_text, (100, y_offset))
+        # Poziom gracza
+        level_text = bold_font.render(f"Poziom Gracza: {self.player.level}", True, COLOR_WHITE)
+        screen.blit(level_text, (200, y_offset))
+        # Doświadczenie
+        exp_text = bold_font.render(f"Exp: {self.player.exp}", True, COLOR_WHITE)
+        screen.blit(exp_text, (350, y_offset))
 
     def handle_input(self):
         dx, dy = 0, 0
@@ -317,8 +383,16 @@ class Game:
     def attack(self):
         for monster in self.monsters:
             if abs(monster.x - self.player.x) <= 1 and abs(monster.y - self.player.y) <= 1:
-                damage = self.player.total_attack()
+                # Monster defense, if critical hit, ignore defense
+                defence = monster.defense
+                if random.random() < 0.1:
+                    defence = 0
+
+                # Damage calculation
+                damage = max(1, self.player.total_attack() - defence)
                 monster.hp -= damage
+
+                #  Check : Monster is dead
                 if monster.hp <= 0:
                     self.player.exp += monster.exp_value
                     # Sprawdź poziomowanie
@@ -335,14 +409,13 @@ class Game:
         inventory_open = True
         cursor = 0
         while inventory_open:
-            screen.fill((0, 0, 0))
+            screen.fill(COLOR_BLACK)
             # Wyświetl tytuł
-            title_surface = font.render("Ekwipunek:", True, (255, 255, 255))
+            title_surface = font.render("Ekwipunek:", True, COLOR_WHITE)
             screen.blit(title_surface, (10, 10))
             # Wyświetl przedmioty
             inventory_sorted = sorted(self.player.inventory, key=lambda x: x.total, reverse=True)
 
-            # Here is somthing wrong with selecting items if inventory is sorted!
             for idx, item in enumerate(inventory_sorted):
                 y_pos = 40 + idx * 30
                 marker = ">" if idx == cursor else " "
@@ -351,12 +424,12 @@ class Game:
                     if item in self.player.equipped.values():
                         equip_status = " [Założony]"
                 item_text = f"{marker} {idx + 1}. {item}{equip_status}"
-                item_surface = font.render(item_text, True, (255, 255, 255))
+                item_surface = font.render(item_text, True, COLOR_WHITE)
                 screen.blit(item_surface, (10, y_pos))
 
             # Wyświetl instrukcje
             instructions = "U - użyj/załóż, D - wyrzuć, Esc - powrót"
-            instructions_surface = font.render(instructions, True, (255, 255, 255))
+            instructions_surface = font.render(instructions, True, COLOR_WHITE)
             screen.blit(instructions_surface, (10, SCREEN_HEIGHT - 40))
             pygame.display.flip()
 
@@ -367,11 +440,11 @@ class Game:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_UP and cursor > 0:
                         cursor -= 1
-                    elif event.key == pygame.K_DOWN and cursor < len(self.player.inventory) - 1:
+                    elif event.key == pygame.K_DOWN and cursor < len(inventory_sorted) - 1:
                         cursor += 1
                     elif event.key == pygame.K_u:
-                        if len(self.player.inventory) > 0:
-                            item = self.player.inventory[cursor]
+                        if len(inventory_sorted) > 0:
+                            item = inventory_sorted[cursor]
                             category = item.category
                             if category == "potion":
                                 # Użyj mikstury
@@ -379,9 +452,10 @@ class Game:
                                 if self.player.hp > self.player.max_hp:
                                     self.player.hp = self.player.max_hp
                                 # Usuń miksturę z ekwipunku
-                                del self.player.inventory[cursor]
-                                if cursor >= len(self.player.inventory):
-                                    cursor = len(self.player.inventory) - 1
+                                self.player.inventory.remove(item)
+                                inventory_sorted.remove(item)
+                                if cursor >= len(inventory_sorted):
+                                    cursor = len(inventory_sorted) - 1
                             else:
                                 if category in self.player.equipped and self.player.equipped[category] == item:
                                     # Zdejmij przedmiot
@@ -390,11 +464,13 @@ class Game:
                                     # Załóż przedmiot, zdejmując ewentualnie poprzedni
                                     self.player.equipped[category] = item
                     elif event.key == pygame.K_d:
-                        if len(self.player.inventory) > 0:
+                        if len(inventory_sorted) > 0:
                             # Wyrzuć przedmiot
-                            del self.player.inventory[cursor]
-                            if cursor >= len(self.player.inventory):
-                                cursor = len(self.player.inventory) - 1
+                            item = inventory_sorted[cursor]
+                            self.player.inventory.remove(item)
+                            inventory_sorted.remove(item)
+                            if cursor >= len(inventory_sorted):
+                                cursor = len(inventory_sorted) - 1
                     elif event.key == pygame.K_ESCAPE:
                         inventory_open = False
 
@@ -423,9 +499,14 @@ class Game:
         for monster in self.monsters:
             if abs(monster.x - self.player.x) <= 1 and abs(monster.y - self.player.y) <= 1:
                 if not self.player_moved:
-                    damage = monster.attack - self.player.total_defense()
-                    if damage < 0:
-                        damage = 0
+                    defence = self.player.total_defense()
+                    # Critical hit, ignore defense
+                    if random.random() < 0.1:
+                        defence = 0
+
+                    damage = max(1, monster.attack - defence)
+
+                    # Player : Get damage
                     self.player.hp -= damage
                     if self.player.hp <= 0:
                         self.game_over()
@@ -477,8 +558,8 @@ class Game:
     def game_over(self):
         game_over_screen = True
         while game_over_screen:
-            screen.fill((0, 0, 0))
-            text_surface = font.render("Koniec gry! Naciśnij Enter, aby wyjść.", True, (255, 255, 255))
+            screen.fill(COLOR_BLACK)
+            text_surface = font.render("Koniec gry! Naciśnij Enter, aby wyjść.", True, COLOR_WHITE)
             screen.blit(text_surface, (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2))
             pygame.display.flip()
             for event in pygame.event.get():
@@ -493,8 +574,8 @@ class Game:
     def game_win(self):
         game_win_screen = True
         while game_win_screen:
-            screen.fill((0, 0, 0))
-            text_surface = font.render("Gratulacje! Wygrałeś! Naciśnij Enter, aby wyjść.", True, (255, 255, 255))
+            screen.fill(COLOR_BLACK)
+            text_surface = font.render("Gratulacje! Wygrałeś! Naciśnij Enter, aby wyjść.", True, COLOR_WHITE)
             screen.blit(text_surface, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2))
             pygame.display.flip()
             for event in pygame.event.get():
