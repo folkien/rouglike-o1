@@ -228,11 +228,11 @@ class Game:
         )[0]
 
         if monster_type == "Goblin":
-            monster = Monster(x, y, goblin_image, "Goblin", hp=30, attack=5, defense=1, exp_value=25)
+            monster = Monster(x, y, goblin_image, "Goblin", hp=30, attack=8, defense=3, exp_value=50)
         elif monster_type == "Troll":
-            monster = Monster(x, y, troll_image, "Troll", hp=100, attack=15, defense=10, exp_value=150)
+            monster = Monster(x, y, troll_image, "Troll", hp=100, attack=15, defense=40, exp_value=250)
         elif monster_type == "Smok":
-            monster = Monster(x, y, dragon_image, "Smok", hp=400, attack=35, defense=30, exp_value=1000)
+            monster = Monster(x, y, dragon_image, "Smok", hp=400, attack=55, defense=25, exp_value=1200)
 
         return monster
 
@@ -330,11 +330,14 @@ class Game:
         def_text = bold_font.render(f"Def: {self.player.total_defense()}", True, COLOR_PURPLE)
         screen.blit(def_text, (100, y_offset))
         # Poziom gracza
-        level_text = bold_font.render(f"Poziom Gracza: {self.player.level}", True, COLOR_WHITE)
+        level_text = bold_font.render(f"Lvl: {self.player.level}", True, COLOR_WHITE)
         screen.blit(level_text, (200, y_offset))
         # Doświadczenie
         exp_text = bold_font.render(f"Exp: {self.player.exp}", True, COLOR_WHITE)
         screen.blit(exp_text, (350, y_offset))
+        # Poziom lochu
+        dungeon_level_text = bold_font.render(f"Stage: {self.level}", True, COLOR_WHITE)
+        screen.blit(dungeon_level_text, (500, y_offset))
 
     def handle_input(self):
         dx, dy = 0, 0
