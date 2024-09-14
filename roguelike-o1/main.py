@@ -255,9 +255,13 @@ class Game:
         if monster_type == "Goblin":
             monster = Monster(x, y, goblin_image, "Goblin", hp=30, attack=8, defense=3, exp_value=50)
         elif monster_type == "Troll":
-            monster = Monster(x, y, troll_image, "Troll", hp=100, attack=15, defense=40, exp_value=250)
+            monster = Monster(
+                x, y, troll_image, "Troll", hp=random.randint(80, 150), attack=15, defense=40, exp_value=250
+            )
         elif monster_type == "Smok":
-            monster = Monster(x, y, dragon_image, "Smok", hp=400, attack=55, defense=25, exp_value=1200)
+            monster = Monster(
+                x, y, dragon_image, "Smok", hp=random.randint(300, 500), attack=55, defense=25, exp_value=1200
+            )
 
         return monster
 
@@ -274,7 +278,7 @@ class Game:
         if random.random() < 0.2:
             category = "potion"
             name = "Mikstura Leczenia"
-            healing = 25  # Mikstura leczy 25 HP
+            healing = 25 + random.randint(0, self.level * 5)
             image = item_images[category]
             return Item(name, category, image, healing=healing)
         else:
